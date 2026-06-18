@@ -485,7 +485,13 @@ server <- function(input, output, session)
       lty = 2,
       col="red"
     )
-    
+    abline(
+      v = unique(c(
+        a,
+        b
+      )),
+      lty = 2
+    )
   })
   
   output$density_plot <- renderPlot({
@@ -534,6 +540,66 @@ server <- function(input, output, session)
     mtext(side = 4, "Consequence", cex = 2, col="blue")
     abline(v=c(a,b),lty = 2)
   })
+  
+  output$compare_density_plot <- renderPlot({
+    
+    
+    
+    mod <- fit()[[1]]
+    mod2 <- fit()[[2]]
+    
+    
+    
+    tt <- seq(
+      1e-6,
+      max(b),
+      length.out = 1000
+    )
+    
+    f_dens1 =  mod$f_hat(tt)
+    f_dens2 =  mod2$f_hat(tt)
+    
+    Y_to_h <- function(y) y * (max(f_dens2) / max(mod2$Y))
+    plot(
+      tt,
+      f_dens1,
+      ylim=range(f_dens1, f_dens2),
+      type = "l",
+      lwd = 3,
+      xlab = "Months",
+      ylab = "Density",
+      main = "Injury Density"
+    )
+    points(
+      tt,
+      f_dens2,
+     col="red",
+     lty=2,
+      type = "l",
+      lwd = 3
+    )
+    
+    for (i in seq_along(a)) {
+      if(!is.infinite(b[i])){
+        segments(a[i], Y_to_h(mod$Y[i]), mod$b[i], Y_to_h(mod$Y[i]),
+                 lwd = 6, col = "blue", lty = 2)
+      }else{
+        segments(a[i], Y_to_h(mod$Y[i]), 120, Y_to_h(mod$Y[i]),
+                 lwd = 6, col = "blue", lty = 2)
+        
+      }
+      
+    }
+    
+    axis(side = 4,
+         at = Y_to_h(pretty(c(0, 100))),
+         labels = pretty(c(0, 100)),
+         col.axis = "blue",
+         col = "blue", tick=F)
+    mtext(side = 4, "Days lost", cex = 2, col="blue")
+    abline(v=c(a,b),lty = 2)
+  })
+  
   
   output$results_tbl <- renderTable({
     
