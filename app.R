@@ -283,22 +283,31 @@ ui <- fluidPage(
       tabsetPanel(
         
         tabPanel(
-          "Hazard",
+          "Baseline Hazard",
           plotOutput("hazard_plot", height = 500)
         ),
+    
         tabPanel(
-          "Density",
+          "Baseline Density",
           plotOutput("density_plot", height = 500)
         ),
         tabPanel(
-          "Risk",
+          "Baseline Risk",
           plotOutput("risk_plot", height = 500)
+        ),
+        tabPanel(
+          "Compounded Hazard",
+          plotOutput("compare_hazard_plot", height = 500)
+        ),
+        tabPanel(
+          "Compounded Risk",
+          plotOutput("compare_risk_plot", height = 500)
         ),
         
         
         
         tabPanel(
-          "Results",
+          "Expected days lost",
           tableOutput("results_tbl")
         )
       )
@@ -385,7 +394,43 @@ server <- function(input, output, session)
     
   })
   
-  
+  output$compare_hazard_plot <- renderPlot({
+    
+    mod <- fit()[[1]]
+    mod2 <- fit()[[2]]
+    
+    tt <- seq(
+      1e-6,
+      max(b),
+      length.out = 1000
+    )
+    
+    h_hat1 = mod$h_hat(tt)
+    h_hat2 = mod2$h_hat(tt)
+    
+    plot(
+      tt,
+      mod$h_hat(tt),
+      type = "l",
+      ylim = range(h_hat1,h_hat2),
+      lwd = 3,
+      xlab = "Months",
+      ylab = "Hazard",
+      main = "Continuous Hazard"
+    )
+    points( tt,
+            mod2$h_hat(tt), col = "red", type = "l", lwd= 3, lty = 2)
+    
+    
+    abline(
+      v = unique(c(
+        a,
+        b
+      )),
+      lty = 2
+    )
+    
+  })
   output$risk_plot <- renderPlot({
     
     mod <- fit()[[1]]
@@ -404,6 +449,40 @@ server <- function(input, output, session)
       xlab = "Months",
       ylab = "Risk",
       main = "Risk Curve"
+    )
+    
+  })
+  
+  output$compare_risk_plot <- renderPlot({
+    
+    mod <- fit()[[1]]
+    mod2 <- fit()[[2]]
+    
+    tt <- seq(
+      0,
+      max(b),
+      length.out = 1000
+    )
+    R_Hat1 =  mod$Risk_hat(tt)
+    R_Hat2 =  mod2$Risk_hat(tt)
+    
+    plot(
+      tt,
+      R_Hat1,
+      ylim = range(R_Hat1, R_Hat2),
+      type = "l",
+      lwd = 3,
+      xlab = "Months",
+      ylab = "Risk",
+      main = "Risk Curve"
+    )
+    points(
+      tt,
+      R_Hat2,
+      type = "l",
+      lwd = 3,
+      lty = 2,
+      col="red"
     )
     
   })
