@@ -7,22 +7,23 @@ library(splines2)
 #------------------------------------------------------------
 # Default data
 #------------------------------------------------------------
-a <- c(0, 6, 12, 24, 48, 96)
-b <- c(6, 12, 24, 48, 96, 144)
+a <- c(0, 6, 12, 24, 48, 96, 120)
+b <- c(6, 12, 24, 48, 96, 120, 144)
 
 
 default_data <- data.frame(
   time_period = c(
     "0-6 months",
     "6-12 months",
-    "12-24 months",
-    "24-48 months",
-    "48-96 months",
-    "96-144 months"
+    "1-2 years",
+    "2-4 years",
+    "4-8 years",
+    "8-10 years",
+    "10-12 years"
   ),
-  Probability  = c(0.20, 0.10, 0.10, 0.30, 0.1, 0.1),
-  Days_lost_average     = c(70, 50, 50, 75, 30, 30),
-  Prob_multiplier = c(1, 1, 1, 1.3, 3, 1)
+  Probability  = c(0.20, 0.10, 0.10, 0.30, 0.1, 0.1, 0.1),
+  Days_lost_average     = c(70, 50, 50, 75, 30, 30, 30),
+  Prob_multiplier = c(1, 1, 1, 1.3, 3, 1, 1)
 )
 
 #------------------------------------------------------------
@@ -330,7 +331,7 @@ server <- function(input, output, session)
     
     rhandsontable(
       rv$dat,
-      rowHeaders = TRUE  ) |>
+      rowHeaders = F  ) |>
       hot_row("Probability") |>
       hot_row("Days_lost_average") |>
       hot_row("Prob_multiplier")
@@ -517,10 +518,10 @@ server <- function(input, output, session)
     for (i in seq_along(a)) {
       if(!is.infinite(b[i])){
         segments(a[i], Y_to_h(mod$Y[i]), mod$b[i], Y_to_h(mod$Y[i]),
-                 lwd = 6, col = "red", lty = 2)
+                 lwd = 6, col = "blue", lty = 2)
       }else{
         segments(a[i], Y_to_h(mod$Y[i]), 120, Y_to_h(mod$Y[i]),
-                 lwd = 6, col = "red", lty = 2)
+                 lwd = 6, col = "blue", lty = 2)
         
       }
       
@@ -528,9 +529,9 @@ server <- function(input, output, session)
     axis(side = 4,
          at = Y_to_h(pretty(c(0, 100))),
          labels = pretty(c(0, 100)),
-         col.axis = "red",
-         col = "red", tick=F)
-    mtext(side = 4, "Consequence", cex = 2, col="red")
+         col.axis = "blue",
+         col = "blue", tick=F)
+    mtext(side = 4, "Consequence", cex = 2, col="blue")
     abline(v=c(a,b),lty = 2)
   })
   
@@ -541,8 +542,8 @@ server <- function(input, output, session)
     
     data.frame(
       Metric = c(
-        "Expected time loss (days)",
-        "Compounded Expected time loss (days)"
+        "Expected days lost",
+        "Compounded expected days lost"
       ),
       Value = round(
         c(
