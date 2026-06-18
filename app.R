@@ -23,7 +23,8 @@ default_data <- data.frame(
   ),
   Probability  = c(0.20, 0.10, 0.10, 0.30, 0.1, 0.1, 0.1),
   Days_lost_average     = c(70, 50, 50, 75, 30, 30, 30),
-  Prob_multiplier = c(1, 1, 1, 1.3, 3, 1, 1)
+  Prob_multiplier = c(2, 3, 1, 1, 1, 1, 1),
+  Days_lost_multiplier = c(1, 3, 1, 1, 1, 1, 1)
 )
 
 #------------------------------------------------------------
@@ -154,7 +155,7 @@ fit_hazard_model_adjusted <- function(dat)
   
   mult = dat$Prob_multiplier
   cond.prob <- 1-(1-dat$Probability)^mult
-  Y <- dat[["Days_lost_average"]]  
+  Y <- dat[["Days_lost_average"]]  * dat[["Days_lost_multiplier"]] 
   knots <- unique(a[-1])
   knots <- knots[knots < max(b)]
   
@@ -309,6 +310,10 @@ ui <- fluidPage(
           plotOutput("compare_hazard_plot", height = 500)
         ),
         tabPanel(
+          "Compounded Density",
+          plotOutput("compare_density_plot", height = 500)
+        ),
+        tabPanel(
           "Compounded Risk",
           plotOutput("compare_risk_plot", height = 500)
         ),
@@ -350,17 +355,19 @@ server <- function(input, output, session)
     ) |>
       hot_row("Probability") |>
       hot_row("Days_lost_average") |>
-      hot_row("Prob_multiplier")
+      hot_row("Prob_multiplier")|>
+      hot_row("Days_lost_multiplier")
   })
   
-  observe({
-    
+  observeEvent(input$tbl$changes$changes, {
     tbl <- hot_to_r(input$tbl)
     
-    if(!is.null(tbl))
+    if (!is.null(tbl)) {
       rv$dat <- tbl
-    
+    }
   })
+  
+  
   
   fit <- reactive({
     
@@ -370,6 +377,8 @@ server <- function(input, output, session)
       need(all(rv$dat$Probability >= 0 & rv$dat$Probability <= 1),
            "Probabilities must be between 0 and 1"),
       need(all(rv$dat$Prob_multiplier >= 0),
+           "Multipliers must be larger than 0"),
+      need(all(rv$dat$Days_lost_multiplier >= 0),
            "Multipliers must be larger than 0"),
       need(all(rv$dat$Days_lost_average >= 0),
            "Cannot lose negative days"),
@@ -450,7 +459,7 @@ server <- function(input, output, session)
     )
     legend(
       "topright",
-      legend = c("Baseline", "Compounded"),
+      legend = c("Baseline hazard", "Compounded hazard"),
       col = c("black", "red"),
       lty = c(1, 2),
       lwd = 3,
@@ -520,7 +529,7 @@ server <- function(input, output, session)
     
     legend(
       "topright",
-      legend = c("Baseline", "Compounded"),
+      legend = c("Baseline risk", "Compounded risk"),
       col = c("black", "red"),
       lty = c(1, 2),
       lwd = 3,
@@ -570,7 +579,7 @@ server <- function(input, output, session)
        tt,
        Y_to_h(mod$Y_func(tt)),
        col="blue",
-       lty=2,
+       lty=1,
        type = "l",
        lwd = 3
      )
@@ -601,7 +610,7 @@ server <- function(input, output, session)
     f_dens1 =  mod$f_hat(tt)
     f_dens2 =  mod2$f_hat(tt)
     
-    Y_to_h <- function(y) y * (max(f_dens2) / max(mod2$Y))
+    Y_to_h <- function(y) y * (max(f_dens2, f_dens1) / max(mod2$Y, mod$Y))
     plot(
       tt,
       f_dens1,
@@ -621,6 +630,14 @@ server <- function(input, output, session)
       lwd = 3
     )
     
+    points(
+      tt,
+      Y_to_h(mod$Y_func(tt)),
+      col="blue",
+      lty=1,
+      type = "l",
+      lwd = 3
+    )
     points(
       tt,
       Y_to_h(mod2$Y_func(tt)),
@@ -644,12 +661,21 @@ server <- function(input, output, session)
    # # }
     
     axis(side = 4,
-         at = Y_to_h(pretty(c(0, 100))),
-         labels = pretty(c(0, 100)),
+         at = Y_to_h(pretty(c(0, max(mod$Y, mod2$Y)))),
+         labels = pretty(c(0, max(mod$Y, mod2$Y))),
          col.axis = "blue",
          col = "blue", tick=F)
     mtext(side = 4, "Days lost", cex = 2, col="blue")
     abline(v=c(a,b),lty = 2)
+    
+    legend(
+      "topright",
+      legend = c("Baseline density", "Compounded density", "Baseline days lost", "Compounded days lost"),
+      col = c("black", "red", "blue", "blue"),
+      lty = c(1, 2, 1 , 2),
+      lwd = 3,
+      bty = "n"
+    )
   })
   
   
