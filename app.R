@@ -424,6 +424,9 @@ server <- function(input, output, session)
     h_hat1 = mod$h_hat(tt)
     h_hat2 = mod2$h_hat(tt)
     
+    par(mar = c(6, 4, 4, 2) + 0.1)
+    
+    
     plot(
       tt,
       mod$h_hat(tt),
@@ -445,7 +448,14 @@ server <- function(input, output, session)
       )),
       lty = 2
     )
-    
+    legend(
+      "topright",
+      legend = c("Baseline", "Compounded"),
+      col = c("black", "red"),
+      lty = c(1, 2),
+      lwd = 3,
+      bty = "n"
+    )
   })
   output$risk_plot <- renderPlot({
     
@@ -506,6 +516,15 @@ server <- function(input, output, session)
         b
       )),
       lty = 2
+    )
+    
+    legend(
+      "topright",
+      legend = c("Baseline", "Compounded"),
+      col = c("black", "red"),
+      lty = c(1, 2),
+      lwd = 3,
+      bty = "n"
     )
   })
   
