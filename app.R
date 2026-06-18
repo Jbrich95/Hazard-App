@@ -116,16 +116,18 @@ fit_hazard_model <- function(dat)
     }
   )
   
-  E_unconditional <- sum(Y * probs_interval)
+  #E_unconditional <- sum(Y * probs_interval)
   
   Y_func = function(t){
-    Y[max(which(a <= t))]
+  #  Y[max(which(a <= t))]
+    approx(c(0,(a+b)/2,max(b)), c(Y[1],Y, Y[length(Y)]), xout = t)$y
   }
   f_hat <- function(t)
     S_hat(t) * h_hat(t)
   Risk_hat <- function(t)
     f_hat(t)*apply(as.matrix(t), 1, function(x) Y_func(x))
-  
+  E_unconditional <- integrate(function(t)
+    Risk_hat(t), 0, max(b))$value
   
   list(
     h_hat = h_hat,
@@ -135,6 +137,7 @@ fit_hazard_model <- function(dat)
     a = a,
     b = b,
     Y = Y,
+    Y_func= Y_func,
     Risk_hat = Risk_hat,
     fitted_interval = fitted_interval,
     E_unconditional = E_unconditional,
@@ -232,16 +235,20 @@ fit_hazard_model_adjusted <- function(dat)
     }
   )
   
-  E_unconditional <- sum(Y * probs_interval)
-  
+
   Y_func = function(t){
-    Y[max(which(a <= t))]
+    #  Y[max(which(a <= t))]
+    approx(c(0,(a+b)/2,max(b)), c(Y[1],Y, Y[length(Y)]), xout = t)$y
   }
+ # E_unconditional <- sum(Y * probs_interval)
+ 
   f_hat <- function(t)
     S_hat(t) * h_hat(t)
   Risk_hat <- function(t)
     f_hat(t)*apply(as.matrix(t), 1, function(x) Y_func(x))
-  
+  E_unconditional <- integrate(function(t)
+    Risk_hat(t), 0, max(b))$value
+
   
   list(
     h_hat = h_hat,
@@ -251,6 +258,7 @@ fit_hazard_model_adjusted <- function(dat)
     a = a,
     b = b,
     Y = Y,
+    Y_func = Y_func,
     Risk_hat = Risk_hat,
     fitted_interval = fitted_interval,
     E_unconditional = E_unconditional,
@@ -332,6 +340,14 @@ server <- function(input, output, session)
     rhandsontable(
       rv$dat,
       rowHeaders = F  ) |>
+      hot_col("time_period", readOnly = TRUE,   renderer = "
+        function(instance, td, row, col, prop, value, cellProperties) {
+          Handsontable.renderers.TextRenderer.apply(this, arguments);
+          td.style.background = '#f0f0f0';
+          td.style.color = '#666';
+        }
+      "
+    ) |>
       hot_row("Probability") |>
       hot_row("Days_lost_average") |>
       hot_row("Prob_multiplier")
@@ -355,9 +371,8 @@ server <- function(input, output, session)
            "Probabilities must be between 0 and 1"),
       need(all(rv$dat$Prob_multiplier >= 0),
            "Multipliers must be larger than 0"),
-      need(all(rv$dat$Start < rv$dat$End),
-           "Each Start must be less than End"),
-      
+      need(all(rv$dat$Days_lost_average >= 0),
+           "Cannot lose negative days"),
       need(!any(is.na(rv$dat)),
            "Missing values are not allowed")
     )
@@ -521,17 +536,25 @@ server <- function(input, output, session)
       main = "Injury Density"
     )
     
-    for (i in seq_along(a)) {
-      if(!is.infinite(b[i])){
-        segments(a[i], Y_to_h(mod$Y[i]), mod$b[i], Y_to_h(mod$Y[i]),
-                 lwd = 6, col = "blue", lty = 2)
-      }else{
-        segments(a[i], Y_to_h(mod$Y[i]), 120, Y_to_h(mod$Y[i]),
-                 lwd = 6, col = "blue", lty = 2)
-        
-      }
-      
-    }
+    # for (i in seq_along(a)) {
+    #   if(!is.infinite(b[i])){
+    #     segments(a[i], Y_to_h(mod$Y[i]), mod$b[i], Y_to_h(mod$Y[i]),
+    #              lwd = 6, col = "blue", lty = 2)
+    #   }else{
+    #     segments(a[i], Y_to_h(mod$Y[i]), 120, Y_to_h(mod$Y[i]),
+    #              lwd = 6, col = "blue", lty = 2)
+    #     
+    #   }
+    #   
+    # }
+     points(
+       tt,
+       Y_to_h(mod$Y_func(tt)),
+       col="blue",
+       lty=2,
+       type = "l",
+       lwd = 3
+     )
     axis(side = 4,
          at = Y_to_h(pretty(c(0, 100))),
          labels = pretty(c(0, 100)),
@@ -579,17 +602,27 @@ server <- function(input, output, session)
       lwd = 3
     )
     
-    for (i in seq_along(a)) {
-      if(!is.infinite(b[i])){
-        segments(a[i], Y_to_h(mod$Y[i]), mod$b[i], Y_to_h(mod$Y[i]),
-                 lwd = 6, col = "blue", lty = 2)
-      }else{
-        segments(a[i], Y_to_h(mod$Y[i]), 120, Y_to_h(mod$Y[i]),
-                 lwd = 6, col = "blue", lty = 2)
-        
-      }
-      
-    }
+    points(
+      tt,
+      Y_to_h(mod2$Y_func(tt)),
+      col="blue",
+      lty=2,
+      type = "l",
+      lwd = 3
+    )
+   #  # 
+   #  # 
+   #  # for (i in seq_along(a)) {
+   #  #   if(!is.infinite(b[i])){
+   #  #     segments(a[i], Y_to_h(mod$Y[i]), mod$b[i], Y_to_h(mod$Y[i]),
+   #  #              lwd = 6, col = "blue", lty = 2)
+   #  #   }else{
+   #  #     segments(a[i], Y_to_h(mod$Y[i]), 120, Y_to_h(mod$Y[i]),
+   #  #              lwd = 6, col = "blue", lty = 2)
+   #  #     
+   #  #   }
+   #  #   
+   # # }
     
     axis(side = 4,
          at = Y_to_h(pretty(c(0, 100))),
