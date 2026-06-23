@@ -7,8 +7,8 @@ library(splines2)
 #------------------------------------------------------------
 # Default data
 #------------------------------------------------------------
-a <- c(0, 6, 12, 24, 48, 96, 120)
-b <- c(6, 12, 24, 48, 96, 120, 144)
+a <- c(0, 6, 12, 24, 48, 96)
+b <- c(6, 12, 24, 48, 96, 144)
 
 
 default_data <- data.frame(
@@ -18,15 +18,15 @@ default_data <- data.frame(
     "1-2 years",
     "2-4 years",
     "4-8 years",
-    "8-10 years",
-    "10-12 years"
+    "8-12 years"
   ),
-  Probability  = c(0.20, 0.10, 0.10, 0.30, 0.1, 0.1, 0.1),
-  Days_lost_average     = c(70, 50, 50, 75, 30, 30, 30),
-  Prob_multiplier = c(2, 3, 1, 1, 1, 1, 1),
-  Days_lost_multiplier = c(1, 3, 1, 1, 1, 1, 1)
+  Probability  = c(0.30, 0.10, 0.20, 0.50, 0.75, 0.9),
+  Days_lost_average     = c(21, 21, 54, 60, 90, 90),
+  Prob_multiplier = c(1, 1, 1, 1, 1, 1),
+  Days_lost_multiplier = c(1, 1, 1, 1, 1, 1)
 )
 
+knots <- unique(a[-1])
 #------------------------------------------------------------
 # Model fitting function
 #------------------------------------------------------------
@@ -37,7 +37,6 @@ fit_hazard_model <- function(dat)
   
   cond.prob <- dat$Probability
   Y <- dat[["Days_lost_average"]]  
-  knots <- unique(a[-1])
   knots <- knots[knots < max(b)]
   
   if(length(knots) < 1)
@@ -130,6 +129,12 @@ fit_hazard_model <- function(dat)
   E_unconditional <- integrate(function(t)
     Risk_hat(t), 0, max(b))$value
   
+  E_1yr <- integrate(function(t)
+    Risk_hat(t), 0,12)$value
+  E_2yr <- integrate(function(t)
+    Risk_hat(t), 0,24)$value
+  E_5yr <- integrate(function(t)
+    Risk_hat(t), 0,120)$value
   list(
     h_hat = h_hat,
     H_hat = H_hat,
@@ -142,6 +147,9 @@ fit_hazard_model <- function(dat)
     Risk_hat = Risk_hat,
     fitted_interval = fitted_interval,
     E_unconditional = E_unconditional,
+    E_1yr = E_1yr,
+    E_2yr = E_2yr,
+    E_5yr = E_5yr,
     fit = fit
   )
 }
@@ -156,7 +164,6 @@ fit_hazard_model_adjusted <- function(dat)
   mult = dat$Prob_multiplier
   cond.prob <- 1-(1-dat$Probability)^mult
   Y <- dat[["Days_lost_average"]]  * dat[["Days_lost_multiplier"]] 
-  knots <- unique(a[-1])
   knots <- knots[knots < max(b)]
   
   if(length(knots) < 1)
@@ -249,8 +256,12 @@ fit_hazard_model_adjusted <- function(dat)
     f_hat(t)*apply(as.matrix(t), 1, function(x) Y_func(x))
   E_unconditional <- integrate(function(t)
     Risk_hat(t), 0, max(b))$value
-
-  
+  E_1yr <- integrate(function(t)
+    Risk_hat(t), 0,12)$value
+  E_2yr <- integrate(function(t)
+    Risk_hat(t), 0,24)$value
+  E_5yr <- integrate(function(t)
+    Risk_hat(t), 0,120)$value
   list(
     h_hat = h_hat,
     H_hat = H_hat,
@@ -263,6 +274,9 @@ fit_hazard_model_adjusted <- function(dat)
     Risk_hat = Risk_hat,
     fitted_interval = fitted_interval,
     E_unconditional = E_unconditional,
+    E_1yr = E_1yr,
+    E_2yr = E_2yr,
+    E_5yr = E_5yr,
     fit = fit
   )
 }
@@ -272,7 +286,7 @@ fit_hazard_model_adjusted <- function(dat)
 
 ui <- fluidPage(
   
-  titlePanel("Injury Risk / Time-Loss Tool"),
+  titlePanel("Injury Risk (Lateral Meniscectomy)"),
   
   sidebarLayout(
     
@@ -588,7 +602,7 @@ server <- function(input, output, session)
          labels = pretty(c(0, 100)),
          col.axis = "blue",
          col = "blue", tick=F)
-    mtext(side = 4, "Consequence", cex = 2, col="blue")
+    mtext(side = 4, "Days lost", cex = 2, col="blue")
     abline(v=c(a,b),lty = 2)
   })
   
@@ -686,11 +700,29 @@ server <- function(input, output, session)
     
     data.frame(
       Metric = c(
-        "Expected days lost",
-        "Compounded expected days lost"
+        "Expected days lost (1 year)",
+        "Compounded expected days lost (1 year)",
+        "",
+        "Expected days lost (2 years)",
+        "Compounded expected days lost (2 years)",
+        "",
+        "Expected days lost (5 years)",
+        "Compounded expected days lost (5 years)",
+        "",
+        "Expected days lost (12 years)",
+        "Compounded expected days lost (12 years)"
       ),
       Value = round(
         c(
+          mod$E_1yr,
+          mod2$E_1yr,
+          NA,
+          mod$E_2yr,
+          mod2$E_2yr,
+          NA,
+          mod$E_5yr,
+          mod2$E_5yr,
+          NA,
           mod$E_unconditional,
           mod2$E_unconditional
         ),
