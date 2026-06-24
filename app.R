@@ -22,11 +22,14 @@ default_data <- data.frame(
   ),
   Probability  = c(0.30, 0.10, 0.20, 0.50, 0.75, 0.9),
   Days_lost_average     = c(21, 21, 54, 60, 90, 90),
+  Days_lost_lower = c(7, 7, 7, 7, 7, 7),
+  Days_lost_upper = c(180, 180, 270, 365, 540, 540),
   Prob_multiplier = c(1, 1, 1, 1, 1, 1),
   Days_lost_multiplier = c(1, 1, 1, 1, 1, 1)
 )
 
 knots <- unique(a[-1])
+knots <- c(6, 12, 24)
 #------------------------------------------------------------
 # Model fitting function
 #------------------------------------------------------------
@@ -37,6 +40,8 @@ fit_hazard_model <- function(dat)
   
   cond.prob <- dat$Probability
   Y <- dat[["Days_lost_average"]]  
+  Y.upper <- dat[["Days_lost_upper"]]  
+  Y.lower <- dat[["Days_lost_lower"]]  
   knots <- knots[knots < max(b)]
   
   if(length(knots) < 1)
@@ -118,16 +123,37 @@ fit_hazard_model <- function(dat)
   
   #E_unconditional <- sum(Y * probs_interval)
   
-  Y_func = function(t){
-  #  Y[max(which(a <= t))]
-    approx(c(0,(a+b)/2,max(b)), c(Y[1],Y, Y[length(Y)]), xout = t)$y
-  }
+  
   f_hat <- function(t)
     S_hat(t) * h_hat(t)
+  
+  Y_func = function(t){
+    #  Y[max(which(a <= t))]
+    approx(c(0,(a+b)/2,max(b)), c(Y[1],Y, Y[length(Y)]), xout = t)$y
+  }
   Risk_hat <- function(t)
     f_hat(t)*apply(as.matrix(t), 1, function(x) Y_func(x))
   E_unconditional <- integrate(function(t)
     Risk_hat(t), 0, max(b))$value
+  
+  Y_func.upper = function(t){
+    #  Y[max(which(a <= t))]
+    approx(c(0,(a+b)/2,max(b)), c(Y.upper[1],Y.upper, Y.upper[length(Y.upper)]), xout = t)$y
+  }
+  Risk_hat.upper <- function(t)
+    f_hat(t)*apply(as.matrix(t), 1, function(x) Y_func.upper(x))
+  E_unconditional.upper <- integrate(function(t)
+    Risk_hat.upper(t), 0, max(b))$value
+  
+  Y_func.lower = function(t){
+    #  Y[max(which(a <= t))]
+    approx(c(0,(a+b)/2,max(b)), c(Y.lower[1],Y.lower, Y.lower[length(Y.lower)]), 
+           xout = t)$y
+  }
+  Risk_hat.lower <- function(t)
+    f_hat(t)*apply(as.matrix(t), 1, function(x) Y_func.lower(x))
+  E_unconditional.lower <- integrate(function(t)
+    Risk_hat.lower(t), 0, max(b))$value
   
   E_1yr <- integrate(function(t)
     Risk_hat(t), 0,12)$value
@@ -135,6 +161,21 @@ fit_hazard_model <- function(dat)
     Risk_hat(t), 0,24)$value
   E_5yr <- integrate(function(t)
     Risk_hat(t), 0,120)$value
+  
+  E_1yr.upper <- integrate(function(t)
+    Risk_hat.upper(t), 0,12)$value
+  E_2yr.upper <- integrate(function(t)
+    Risk_hat.upper(t), 0,24)$value
+  E_5yr.upper <- integrate(function(t)
+    Risk_hat.upper(t), 0,120)$value
+  
+  E_1yr.lower <- integrate(function(t)
+    Risk_hat.lower(t), 0,12)$value
+  E_2yr.lower <- integrate(function(t)
+    Risk_hat.lower(t), 0,24)$value
+  E_5yr.lower <- integrate(function(t)
+    Risk_hat.lower(t), 0,120)$value
+  
   list(
     h_hat = h_hat,
     H_hat = H_hat,
@@ -145,11 +186,23 @@ fit_hazard_model <- function(dat)
     Y = Y,
     Y_func= Y_func,
     Risk_hat = Risk_hat,
+    Y_func.upper = Y_func.upper,
+    Risk_hat.upper = Risk_hat.upper,
+    Y_func.lower= Y_func.lower,
+    Risk_hat.lower = Risk_hat.lower,
     fitted_interval = fitted_interval,
     E_unconditional = E_unconditional,
     E_1yr = E_1yr,
     E_2yr = E_2yr,
     E_5yr = E_5yr,
+    E_unconditional.upper = E_unconditional.upper,
+    E_1yr.upper = E_1yr.upper,
+    E_2yr.upper = E_2yr.upper,
+    E_5yr.upper = E_5yr.upper,
+    E_unconditional.lower = E_unconditional.lower,
+    E_1yr.lower = E_1yr.lower,
+    E_2yr.lower = E_2yr.lower,
+    E_5yr.lower = E_5yr.lower,
     fit = fit
   )
 }
@@ -164,6 +217,9 @@ fit_hazard_model_adjusted <- function(dat)
   mult = dat$Prob_multiplier
   cond.prob <- 1-(1-dat$Probability)^mult
   Y <- dat[["Days_lost_average"]]  * dat[["Days_lost_multiplier"]] 
+  Y.upper <- dat[["Days_lost_upper"]]   * dat[["Days_lost_multiplier"]] 
+  Y.lower <- dat[["Days_lost_lower"]]  * dat[["Days_lost_multiplier"]] 
+  
   knots <- knots[knots < max(b)]
   
   if(length(knots) < 1)
@@ -252,16 +308,56 @@ fit_hazard_model_adjusted <- function(dat)
  
   f_hat <- function(t)
     S_hat(t) * h_hat(t)
+  
+  Y_func = function(t){
+    #  Y[max(which(a <= t))]
+    approx(c(0,(a+b)/2,max(b)), c(Y[1],Y, Y[length(Y)]), xout = t)$y
+  }
   Risk_hat <- function(t)
     f_hat(t)*apply(as.matrix(t), 1, function(x) Y_func(x))
   E_unconditional <- integrate(function(t)
     Risk_hat(t), 0, max(b))$value
+  
+  Y_func.upper = function(t){
+    #  Y[max(which(a <= t))]
+    approx(c(0,(a+b)/2,max(b)), c(Y.upper[1],Y.upper, Y.upper[length(Y.upper)]), xout = t)$y
+  }
+  Risk_hat.upper <- function(t)
+    f_hat(t)*apply(as.matrix(t), 1, function(x) Y_func.upper(x))
+  E_unconditional.upper <- integrate(function(t)
+    Risk_hat.upper(t), 0, max(b))$value
+  
+  Y_func.lower = function(t){
+    #  Y[max(which(a <= t))]
+    approx(c(0,(a+b)/2,max(b)), c(Y.lower[1],Y.lower, Y.lower[length(Y.lower)]), 
+           xout = t)$y
+  }
+  Risk_hat.lower <- function(t)
+    f_hat(t)*apply(as.matrix(t), 1, function(x) Y_func.lower(x))
+  E_unconditional.lower <- integrate(function(t)
+    Risk_hat.lower(t), 0, max(b))$value
+  
   E_1yr <- integrate(function(t)
     Risk_hat(t), 0,12)$value
   E_2yr <- integrate(function(t)
     Risk_hat(t), 0,24)$value
   E_5yr <- integrate(function(t)
     Risk_hat(t), 0,120)$value
+  
+  E_1yr.upper <- integrate(function(t)
+    Risk_hat.upper(t), 0,12)$value
+  E_2yr.upper <- integrate(function(t)
+    Risk_hat.upper(t), 0,24)$value
+  E_5yr.upper <- integrate(function(t)
+    Risk_hat.upper(t), 0,120)$value
+  
+  E_1yr.lower <- integrate(function(t)
+    Risk_hat.lower(t), 0,12)$value
+  E_2yr.lower <- integrate(function(t)
+    Risk_hat.lower(t), 0,24)$value
+  E_5yr.lower <- integrate(function(t)
+    Risk_hat.lower(t), 0,120)$value
+  
   list(
     h_hat = h_hat,
     H_hat = H_hat,
@@ -270,13 +366,25 @@ fit_hazard_model_adjusted <- function(dat)
     a = a,
     b = b,
     Y = Y,
-    Y_func = Y_func,
+    Y_func= Y_func,
     Risk_hat = Risk_hat,
+    Y_func.upper = Y_func.upper,
+    Risk_hat.upper = Risk_hat.upper,
+    Y_func.lower= Y_func.lower,
+    Risk_hat.lower = Risk_hat.lower,
     fitted_interval = fitted_interval,
     E_unconditional = E_unconditional,
     E_1yr = E_1yr,
     E_2yr = E_2yr,
     E_5yr = E_5yr,
+    E_unconditional.upper = E_unconditional.upper,
+    E_1yr.upper = E_1yr.upper,
+    E_2yr.upper = E_2yr.upper,
+    E_5yr.upper = E_5yr.upper,
+    E_unconditional.lower = E_unconditional.lower,
+    E_1yr.lower = E_1yr.lower,
+    E_2yr.lower = E_2yr.lower,
+    E_5yr.lower = E_5yr.lower,
     fit = fit
   )
 }
@@ -369,6 +477,8 @@ server <- function(input, output, session)
     ) |>
       hot_row("Probability") |>
       hot_row("Days_lost_average") |>
+      hot_row("Days_lost_lower") |>
+      hot_row("Days_lost_upper") |>
       hot_row("Prob_multiplier")|>
       hot_row("Days_lost_multiplier")
   })
@@ -395,6 +505,10 @@ server <- function(input, output, session)
       need(all(rv$dat$Days_lost_multiplier >= 0),
            "Multipliers must be larger than 0"),
       need(all(rv$dat$Days_lost_average >= 0),
+           "Cannot lose negative days"),
+      need(all(rv$dat$Days_lost_upper >= 0),
+           "Cannot lose negative days"),
+      need(all(rv$dat$Days_lost_lower >= 0),
            "Cannot lose negative days"),
       need(!any(is.na(rv$dat)),
            "Missing values are not allowed")
@@ -450,6 +564,7 @@ server <- function(input, output, session)
     par(mar = c(6, 4, 4, 2) + 0.1)
     
     
+    
     plot(
       tt,
       mod$h_hat(tt),
@@ -480,6 +595,7 @@ server <- function(input, output, session)
       bty = "n"
     )
   })
+  
   output$risk_plot <- renderPlot({
     
     mod <- fit()[[1]]
@@ -490,16 +606,57 @@ server <- function(input, output, session)
       length.out = 1000
     )
     
+    risk      <- mod$Risk_hat(tt)
+    risk.upper <- mod$Risk_hat.upper(tt)
+    risk.lower <- mod$Risk_hat.lower(tt)
+    
     plot(
       tt,
-      mod$Risk_hat(tt),
+    log = "y",
+      risk,
       type = "l",
+      ylim = c(min(risk.lower[risk.lower>0]), max(risk.upper)),
       lwd = 3,
       xlab = "Months",
       ylab = "Risk",
       main = "Risk Curve"
     )
     
+    polygon(
+      c(tt, rev(tt)),
+      c(risk.upper, rev(risk.lower)),
+      col = adjustcolor("steelblue", alpha.f = 0.25),
+      border = NA
+    )
+    
+    lines(
+      tt,
+      risk,
+      lwd = 3,
+      col = "black"
+    )
+    
+    lines(
+      tt,
+      risk.upper,
+      lty = 2,
+      col = "steelblue"
+    )
+    
+    lines(
+      tt,
+      risk.lower,
+      lty = 2,
+      col = "steelblue"
+    )
+    legend(
+      "topright",
+      legend = c("Average risk", "Risk range"),
+      col = c("black", "steelblue"),
+      lty = c(1, 1),
+      lwd = 3,
+      bty = "n"
+    )
   })
   
   output$compare_risk_plot <- renderPlot({
@@ -512,13 +669,21 @@ server <- function(input, output, session)
       max(b),
       length.out = 1000
     )
-    R_Hat1 =  mod$Risk_hat(tt)
-    R_Hat2 =  mod2$Risk_hat(tt)
+    
+    risk1      <- mod$Risk_hat(tt)
+    risk.upper1 <- mod$Risk_hat.upper(tt)
+    risk.lower1 <- mod$Risk_hat.lower(tt)
+    risk2      <- mod2$Risk_hat(tt)
+    risk.upper2 <- mod2$Risk_hat.upper(tt)
+    risk.lower2 <- mod2$Risk_hat.lower(tt)
     
     plot(
       tt,
-      R_Hat1,
-      ylim = range(R_Hat1, R_Hat2),
+      risk1,
+      log = "y",
+      ylim = c(min(risk.lower1[risk.lower1 > 0], risk.lower2[risk.lower2 >
+                                                               0]),
+               max(risk.upper2, risk.upper1)),    
       type = "l",
       lwd = 3,
       xlab = "Months",
@@ -527,12 +692,13 @@ server <- function(input, output, session)
     )
     points(
       tt,
-      R_Hat2,
+      risk2,
       type = "l",
       lwd = 3,
       lty = 2,
       col="red"
     )
+    
     abline(
       v = unique(c(
         a,
@@ -541,14 +707,73 @@ server <- function(input, output, session)
       lty = 2
     )
     
+    polygon(
+      c(tt, rev(tt)),
+      c(risk.upper1, rev(risk.lower1)),
+      col = adjustcolor("steelblue", alpha.f = 0.25),
+      border = NA
+    )
+    polygon(
+      c(tt, rev(tt)),
+      c(risk.upper2, rev(risk.lower2)),
+      col = adjustcolor("red", alpha.f = 0.25),
+      border = NA
+    )
+    
+
+    lines(
+      tt,
+      risk1,
+      lwd = 3,
+      col = "black"
+    )
+    
+    lines(
+      tt,
+      risk.upper1,
+      lty = 2,
+      col = "steelblue"
+    )
+    lines(
+      tt,
+      risk.lower1,
+      lty = 2,
+      col = "steelblue"
+    )
+
+    
+    lines(
+      tt,
+      risk2,
+      lwd = 3,
+      lty = 2,
+      col = "red"
+    )
+    
+    lines(
+      tt,
+      risk.upper2,
+      lty = 2,
+      col = "red"
+    )
+    lines(
+      tt,
+      risk.lower2,
+      lty = 2,
+      col = "red"
+    )
+    
+    
     legend(
       "topright",
-      legend = c("Baseline risk", "Compounded risk"),
-      col = c("black", "red"),
-      lty = c(1, 2),
+      legend = c("Baseline average risk", "Compounded average risk",
+                 "Baseline risk range", "Compounded risk range"),
+      col = c("black", "red", "steelblue", adjustcolor("red", alpha.f = 0.25)),
+      lty = c(1, 2, 1, 1),
       lwd = 3,
       bty = "n"
     )
+    
   })
   
   output$density_plot <- renderPlot({
@@ -694,9 +919,51 @@ server <- function(input, output, session)
   
   
   output$results_tbl <- renderTable({
-    
-    mod <- fit()[[1]]
+    mod  <- fit()[[1]]
     mod2 <- fit()[[2]]
+    
+    
+    mean_vals <- c(
+      mod$E_1yr,
+      mod2$E_1yr,
+      NA,
+      mod$E_2yr,
+      mod2$E_2yr,
+      NA,
+      mod$E_5yr,
+      mod2$E_5yr,
+      NA,
+      mod$E_unconditional,
+      mod2$E_unconditional
+    )
+    
+    lower_vals <- c(
+      mod$E_1yr.lower,
+      mod2$E_1yr.lower,
+      NA,
+      mod$E_2yr.lower,
+      mod2$E_2yr.lower,
+      NA,
+      mod$E_5yr.lower,
+      mod2$E_5yr.lower,
+      NA,
+      mod$E_unconditional.lower,
+      mod2$E_unconditional.lower
+    )
+    
+    upper_vals <- c(
+      mod$E_1yr.upper,
+      mod2$E_1yr.upper,
+      NA,
+      mod$E_2yr.upper,
+      mod2$E_2yr.upper,
+      NA,
+      mod$E_5yr.upper,
+      mod2$E_5yr.upper,
+      NA,
+      mod$E_unconditional.upper,
+      mod2$E_unconditional.upper
+    )
     
     data.frame(
       Metric = c(
@@ -712,27 +979,17 @@ server <- function(input, output, session)
         "Expected days lost (12 years)",
         "Compounded expected days lost (12 years)"
       ),
-      Value = round(
-        c(
-          mod$E_1yr,
-          mod2$E_1yr,
-          NA,
-          mod$E_2yr,
-          mod2$E_2yr,
-          NA,
-          mod$E_5yr,
-          mod2$E_5yr,
-          NA,
-          mod$E_unconditional,
-          mod2$E_unconditional
-        ),
-        3
-      )
+      
+      Value = ifelse(
+        is.na(mean_vals),
+        "",
+        sprintf("%.1f (%.1f - %.1f)", mean_vals, lower_vals, upper_vals)
+      ),
+      check.names = FALSE
+      
     )
     
   })
-  
 }
-
 shinyApp(ui, server,  options = list(launch.browser = TRUE))
 
