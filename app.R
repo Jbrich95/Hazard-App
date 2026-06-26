@@ -649,6 +649,14 @@ server <- function(input, output, session)
       lty = 2,
       col = "steelblue"
     )
+    
+    abline(
+      v = unique(c(
+        a,
+        b
+      )),
+      lty = 2
+    )
     legend(
       "topright",
       legend = c("Average risk", "Risk range"),
